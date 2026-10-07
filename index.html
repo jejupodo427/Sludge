@@ -1,0 +1,1762 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>활성슬러지 공법 3D 디지털 트윈 시뮬레이터</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Three.js CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- Three.js OrbitControls -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Pretendard Font for Korean Legibility -->
+    <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard-dynamic-subset.min.css" />
+    <!-- KaTeX for Beautiful Engineering Mathematics -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/contrib/auto-render.min.js"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        dark: {
+                            950: '#050811',
+                            900: '#0a0f1d',
+                            850: '#0e1629',
+                            800: '#141e36',
+                        },
+                        cyan: {
+                            450: '#00c5e0',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Pretendard', '-apple-system', 'BlinkMacSystemFont', 'system-ui', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'Consolas', 'monospace']
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 5px;
+            height: 5px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #050811;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #1e293b;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #334155;
+        }
+        .canvas-container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background: radial-gradient(circle at 50% 45%, #0d1527 0%, #050811 100%);
+        }
+        .glass-panel {
+            background: rgba(10, 15, 29, 0.88);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        .glass-card {
+            background: rgba(14, 22, 41, 0.75);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+        }
+        .katex {
+            font-size: 1.05em !important;
+            color: #f1f5f9;
+        }
+        .katex-display {
+            margin: 0.35em 0 !important;
+        }
+        input[type="range"] {
+            accent-color: #06b6d4;
+        }
+    </style>
+</head>
+<body class="bg-[#050811] text-slate-100 font-sans h-screen flex flex-col overflow-hidden select-none">
+
+    <!-- Top Header -->
+    <header class="h-14 border-b border-slate-800/80 bg-dark-900/95 backdrop-blur px-4 flex items-center justify-between shrink-0 z-20">
+        <div class="flex items-center space-x-3">
+            <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-cyan-500 via-teal-500 to-emerald-500 flex items-center justify-center shadow-lg shadow-cyan-500/25">
+                <i data-lucide="waves" class="w-5 h-5 text-white"></i>
+            </div>
+            <div>
+                <h1 class="text-sm md:text-base font-bold tracking-tight text-white flex items-center gap-2">
+                    활성슬러지 공법 3D 시뮬레이터
+                    <span class="text-[10px] px-2 py-0.5 rounded-full bg-cyan-500/15 text-cyan-300 border border-cyan-500/30 font-mono font-semibold">Standard ASP Twin</span>
+                </h1>
+                <p class="text-[11px] text-slate-400 font-normal">포기조 & 2차 침전지 실시간 물질수지 및 유동 해석</p>
+            </div>
+        </div>
+
+        <div class="flex items-center space-x-2.5">
+            <!-- Dedicated Standard Preset Indicator & Reset Button -->
+            <div class="flex items-center gap-2 bg-dark-850 px-2.5 py-1 rounded-lg border border-cyan-500/30 shadow-inner">
+                <span class="flex h-2 w-2 relative">
+                    <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
+                    <span class="relative inline-flex rounded-full h-2 w-2 bg-cyan-500"></span>
+                </span>
+                <span class="text-xs font-semibold text-cyan-200">표준 활성슬러지법</span>
+                <button id="btnResetStandard" class="ml-1 text-[11px] text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 px-2 py-0.5 rounded border border-slate-700/80 transition flex items-center gap-1" title="표준 운전 기본값으로 초기화">
+                    <i data-lucide="rotate-ccw" class="w-3 h-3 text-cyan-400"></i>
+                    <span>기본값 복원</span>
+                </button>
+            </div>
+
+            <!-- Theory Guide Modal Trigger -->
+            <button id="btnOpenTheory" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-dark-850 hover:bg-slate-800 text-xs text-slate-200 border border-slate-700 transition shadow-sm">
+                <i data-lucide="book-open" class="w-3.5 h-3.5 text-emerald-400"></i>
+                <span class="font-medium">공식 유도 및 이론</span>
+            </button>
+            <!-- Camera Reset Button -->
+            <button id="btnResetView" class="p-1.5 rounded-lg bg-dark-850 hover:bg-slate-800 text-slate-300 border border-slate-700 transition" title="카메라 위치 초기화">
+                <i data-lucide="compass" class="w-4 h-4 text-slate-300"></i>
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Workspace -->
+    <div class="flex-1 flex overflow-hidden relative">
+
+        <!-- Left Sidebar: Parameters Input Control -->
+        <aside class="w-80 md:w-96 glass-panel border-r border-slate-800/80 flex flex-col shrink-0 z-10 overflow-hidden">
+            <div class="p-3 border-b border-slate-800/80 flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                    <i data-lucide="sliders" class="w-4 h-4 text-cyan-400"></i>
+                    <span class="text-xs font-bold text-slate-100 uppercase tracking-wider">공정 제어 인자 (Inputs)</span>
+                </div>
+                <button id="btnAutoBalance" class="text-[11px] text-cyan-300 hover:text-cyan-200 flex items-center gap-1 bg-cyan-950/70 px-2.5 py-0.5 rounded border border-cyan-700/80 transition">
+                    <i data-lucide="sparkles" class="w-3 h-3"></i> F/M 최적화
+                </button>
+            </div>
+
+            <!-- Input Tabs / Scroll Area -->
+            <div class="flex-1 overflow-y-auto p-3 space-y-4 text-xs">
+                
+                <!-- Section 1: 유입 및 포기조 인자 -->
+                <div class="glass-card p-3 rounded-xl border border-slate-800/80">
+                    <h2 class="text-xs font-semibold text-cyan-400 mb-2 flex items-center gap-1.5">
+                        <i data-lucide="box" class="w-3.5 h-3.5"></i> 1. 유입수 및 포기조 (Aeration Tank)
+                    </h2>
+                    <div class="space-y-3">
+                        <!-- Q: 유입유량 -->
+                        <div>
+                            <div class="flex justify-between items-center mb-1">
+                                <label class="text-slate-300 font-medium">유입유량 (<span class="font-mono text-cyan-300 font-bold">Q</span>)</label>
+                                <span class="font-mono text-slate-400"><span id="val_Q">5000</span> <span class="text-[10px]">m³/d</span></span>
+                            </div>
+                            <input type="range" id="input_Q" min="500" max="20000" step="100" value="5000" class="w-full h-1.5 bg-slate-700 rounded-lg cursor-pointer">
+                        </div>
+
+                        <!-- V: 포기조 부피 -->
+                        <div>
+                            <div class="flex justify-between items-center mb-1">
+                                <label class="text-slate-300 font-medium">포기조 부피 (<span class="font-mono text-cyan-300 font-bold">V</span>)</label>
+                                <span class="font-mono text-slate-400"><span id="val_V">1400</span> <span class="text-[10px]">m³</span></span>
+                            </div>
+                            <input type="range" id="input_V" min="200" max="8000" step="50" value="1400" class="w-full h-1.5 bg-slate-700 rounded-lg cursor-pointer">
+                        </div>
+
+                        <!-- X: MLVSS / MLSS 농도 -->
+                        <div>
+                            <div class="flex justify-between items-center mb-1">
+                                <label class="text-slate-300 font-medium">포기조 미생물 농도 (<span class="font-mono text-cyan-300 font-bold">X</span>)</label>
+                                <span class="font-mono text-slate-400"><span id="val_X">1800</span> <span class="text-[10px]">mg/L</span></span>
+                            </div>
+                            <input type="range" id="input_X" min="500" max="6000" step="50" value="1800" class="w-full h-1.5 bg-slate-700 rounded-lg cursor-pointer">
+                        </div>
+
+                        <!-- Ci: 유입 BOD -->
+                        <div>
+                            <div class="flex justify-between items-center mb-1">
+                                <label class="text-slate-300 font-medium">유입 BOD (<span class="font-mono text-cyan-300 font-bold">Ci</span>)</label>
+                                <span class="font-mono text-slate-400"><span id="val_Ci">200</span> <span class="text-[10px]">mg/L</span></span>
+                            </div>
+                            <input type="range" id="input_Ci" min="30" max="800" step="5" value="200" class="w-full h-1.5 bg-slate-700 rounded-lg cursor-pointer">
+                        </div>
+
+                        <!-- Co: 유출 BOD -->
+                        <div>
+                            <div class="flex justify-between items-center mb-1">
+                                <label class="text-slate-300 font-medium">유출 BOD (<span class="font-mono text-cyan-300 font-bold">Co</span>)</label>
+                                <span class="font-mono text-slate-400"><span id="val_Co">15</span> <span class="text-[10px]">mg/L</span></span>
+                            </div>
+                            <input type="range" id="input_Co" min="2" max="60" step="1" value="15" class="w-full h-1.5 bg-slate-700 rounded-lg cursor-pointer">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Section 2: 미생물 동역학 계수 -->
+                <div class="glass-card p-3 rounded-xl border border-slate-800/80">
+                    <h2 class="text-xs font-semibold text-emerald-400 mb-2 flex items-center gap-1.5">
+                        <i data-lucide="dna" class="w-3.5 h-3.5"></i> 2. 미생물 반응 동역학
+                    </h2>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <div class="flex justify-between mb-1">
+                                <label class="text-slate-300">합성수율 (<span class="font-mono font-bold text-emerald-300">Y</span>)</label>
+                                <span id="val_Y" class="font-mono text-slate-400">0.65</span>
+                            </div>
+                            <input type="range" id="input_Y" min="0.30" max="0.85" step="0.01" value="0.65" class="w-full h-1.5 bg-slate-700 rounded-lg cursor-pointer">
+                            <span class="text-[10px] text-slate-500">kg VSS / kg BOD</span>
+                        </div>
+                        <div>
+                            <div class="flex justify-between mb-1">
+                                <label class="text-slate-300">내생호흡 (<span class="font-mono font-bold text-emerald-300">kd</span>)</label>
+                                <span id="val_kd" class="font-mono text-slate-400">0.05</span>
+                            </div>
+                            <input type="range" id="input_kd" min="0.01" max="0.12" step="0.005" value="0.05" class="w-full h-1.5 bg-slate-700 rounded-lg cursor-pointer">
+                            <span class="text-[10px] text-slate-500">day⁻¹</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Section 3: 2차 침전지 및 슬러지 반송/배출 -->
+                <div class="glass-card p-3 rounded-xl border border-slate-800/80">
+                    <h2 class="text-xs font-semibold text-amber-400 mb-2 flex items-center gap-1.5">
+                        <i data-lucide="recycle" class="w-3.5 h-3.5"></i> 3. 2차 침전지 & 슬러지 반송계
+                    </h2>
+                    <div class="space-y-3">
+                        <!-- Xr: 반송슬러지 농도 -->
+                        <div>
+                            <div class="flex justify-between items-center mb-1">
+                                <label class="text-slate-300 font-medium">반송슬러지 농도 (<span class="font-mono text-amber-300 font-bold">Xr</span>)</label>
+                                <span class="font-mono text-slate-400"><span id="val_Xr">8000</span> <span class="text-[10px]">mg/L</span></span>
+                            </div>
+                            <input type="range" id="input_Xr" min="3000" max="15000" step="100" value="8000" class="w-full h-1.5 bg-slate-700 rounded-lg cursor-pointer">
+                        </div>
+
+                        <!-- Qr: 반송슬러지 유량 -->
+                        <div>
+                            <div class="flex justify-between items-center mb-1">
+                                <label class="text-slate-300 font-medium">반송유량 (<span class="font-mono text-amber-300 font-bold">Qr</span>)</label>
+                                <span class="font-mono text-slate-400"><span id="val_Qr">2500</span> <span class="text-[10px]">m³/d</span></span>
+                            </div>
+                            <input type="range" id="input_Qr" min="200" max="10000" step="50" value="2500" class="w-full h-1.5 bg-slate-700 rounded-lg cursor-pointer">
+                            <div class="flex justify-between text-[10px] text-slate-400 mt-0.5">
+                                <span>반송비 (R = Qr/Q):</span>
+                                <span id="val_R_ratio" class="font-mono text-cyan-400 font-bold">50.0%</span>
+                            </div>
+                        </div>
+
+                        <!-- Xe: 유출수 SS 농도 -->
+                        <div>
+                            <div class="flex justify-between items-center mb-1">
+                                <label class="text-slate-300 font-medium">유출수 SS (<span class="font-mono text-amber-300 font-bold">Xe</span>)</label>
+                                <span class="font-mono text-slate-400"><span id="val_Xe">10</span> <span class="text-[10px]">mg/L</span></span>
+                            </div>
+                            <input type="range" id="input_Xe" min="0" max="50" step="1" value="10" class="w-full h-1.5 bg-slate-700 rounded-lg cursor-pointer">
+                        </div>
+
+                        <!-- Qw & Qe 자동/수동 제어 모드 -->
+                        <div class="pt-2 border-t border-slate-700/60">
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-[11px] text-slate-300 font-medium">잉여슬러지 배출 제어:</span>
+                                <span class="text-[10px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded border border-emerald-500/30">물질수지 자동연동</span>
+                            </div>
+                            <div class="bg-slate-900/60 p-2 rounded-lg font-mono text-[11px] space-y-1">
+                                <div class="flex justify-between text-slate-400">
+                                    <span>배출유량 (Qw):</span>
+                                    <span class="text-amber-400 font-bold"><span id="val_Qw">59.4</span> m³/d</span>
+                                </div>
+                                <div class="flex justify-between text-slate-400">
+                                    <span>처리수량 (Qe = Q - Qw):</span>
+                                    <span class="text-cyan-400 font-bold"><span id="val_Qe">4940.6</span> m³/d</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </aside>
+
+        <!-- Center: 3D Simulation Canvas Area -->
+        <main class="flex-1 flex flex-col relative h-full">
+            
+            <!-- 3D Canvas Container -->
+            <div id="canvas-container" class="canvas-container flex-1">
+                <!-- Three.js Canvas gets appended here -->
+
+                <!-- Top Floating Controls -->
+                <div class="absolute top-4 left-4 z-10 flex flex-wrap gap-2">
+                    <!-- View Angles -->
+                    <div class="glass-panel px-2 py-1.5 rounded-xl flex items-center gap-1 shadow-2xl border border-slate-700/60">
+                        <button id="viewIsometric" class="px-2.5 py-1 text-xs rounded-lg bg-dark-850 hover:bg-slate-800 text-cyan-300 font-medium transition">
+                            전체 조감도
+                        </button>
+                        <button id="viewAeration" class="px-2.5 py-1 text-xs rounded-lg hover:bg-slate-800 text-slate-300 transition">
+                            포기조 집중
+                        </button>
+                        <button id="viewClarifier" class="px-2.5 py-1 text-xs rounded-lg hover:bg-slate-800 text-slate-300 transition">
+                            침전지 집중
+                        </button>
+                        <button id="viewPipes" class="px-2.5 py-1 text-xs rounded-lg hover:bg-slate-800 text-slate-300 transition">
+                            배관/반송계
+                        </button>
+                    </div>
+
+                    <!-- Flow Animation Speed / Toggle -->
+                    <div class="glass-panel px-3 py-1.5 rounded-xl flex items-center gap-2 shadow-2xl border border-slate-700/60">
+                        <button id="btnToggleAnim" class="text-slate-300 hover:text-white transition flex items-center gap-1 text-xs">
+                            <i data-lucide="play" id="iconPlay" class="w-3.5 h-3.5 text-emerald-400"></i>
+                            <span id="textPlay">가동 중</span>
+                        </button>
+                        <div class="h-3 w-[1px] bg-slate-700"></div>
+                        <label class="text-[11px] text-slate-300 flex items-center gap-1 cursor-pointer">
+                            폭기 기포:
+                            <input type="checkbox" id="chkBubbles" checked class="rounded accent-cyan-400 cursor-pointer">
+                        </label>
+                    </div>
+                </div>
+
+                <!-- 3D Guide Legend Overlay -->
+                <div class="absolute top-4 right-4 z-10 glass-panel p-3 rounded-xl hidden sm:block max-w-xs shadow-2xl text-[11px] space-y-1.5 border border-slate-700/70">
+                    <div class="font-bold text-slate-100 flex items-center gap-1.5 pb-1 border-b border-slate-800">
+                        <i data-lucide="info" class="w-3.5 h-3.5 text-cyan-400"></i> 3D 공정 구성요소 안내
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <span class="w-2.5 h-2.5 rounded-full bg-cyan-400 shadow-sm shadow-cyan-400/50"></span>
+                        <span class="text-slate-200">유입 원수 ($Q, C_i$)</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <span class="w-2.5 h-2.5 rounded-full bg-amber-500 shadow-sm shadow-amber-500/50"></span>
+                        <span class="text-slate-200">포기조 폭기 혼합액 ($V, X$)</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <span class="w-2.5 h-2.5 rounded-full bg-amber-800 shadow-sm shadow-amber-800/50"></span>
+                        <span class="text-slate-200">침전지 바닥 농축 슬러지 ($X_r$)</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 shadow-sm shadow-emerald-400/50"></span>
+                        <span class="text-slate-200">상등 맑은 처리수 ($Q_e, X_e, C_o$)</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <span class="w-2.5 h-2.5 rounded-full bg-rose-500 shadow-sm shadow-rose-500/50"></span>
+                        <span class="text-slate-200">잉여슬러지 배출 ($Q_w, X_w$)</span>
+                    </div>
+                </div>
+
+                <!-- Bottom Floating HUD: Real-time Key Indicators Quick View -->
+                <div class="absolute bottom-4 left-4 right-4 z-10 grid grid-cols-2 md:grid-cols-4 gap-2.5 pointer-events-none">
+                    
+                    <!-- Card 1: 체류시간 t (HRT) -->
+                    <div class="glass-panel p-3 rounded-xl border border-slate-700/70 shadow-2xl pointer-events-auto">
+                        <div class="flex items-center justify-between text-slate-300 text-xs">
+                            <span class="font-bold text-slate-100">체류시간 (<span class="text-cyan-300 font-mono">HRT, t</span>)</span>
+                            <span class="text-[10px] text-cyan-300 bg-cyan-950/80 px-2 py-0.5 rounded border border-cyan-700/50 font-mono">t = V / Q</span>
+                        </div>
+                        <div class="mt-1 flex items-baseline gap-2">
+                            <span id="card_t_hr" class="text-2xl font-bold font-mono text-cyan-300">6.7</span>
+                            <span class="text-xs text-slate-300">시간 (hr)</span>
+                            <span class="text-xs font-mono text-slate-400">(<span id="card_t_day">0.28</span> 일)</span>
+                        </div>
+                        <div class="flex items-center gap-1.5 mt-1">
+                            <span id="badge_hrt_status" class="w-2 h-2 rounded-full bg-emerald-400"></span>
+                            <span id="text_hrt_status" class="text-[10px] text-emerald-300 font-medium">적정 체류 (6~8 hr)</span>
+                        </div>
+                        <div class="text-[9.5px] text-slate-400 mt-0.5">표준설계 기준: 6.0 ~ 8.0 hr</div>
+                    </div>
+
+                    <!-- Card 2: F/M 비 -->
+                    <div class="glass-panel p-3 rounded-xl border border-slate-700/70 shadow-2xl pointer-events-auto">
+                        <div class="flex items-center justify-between text-slate-300 text-xs">
+                            <span class="font-bold text-slate-100">F/M 비 (유기물 부하)</span>
+                            <span class="text-[10px] text-emerald-300 bg-emerald-950/80 px-1.5 py-0.5 rounded border border-emerald-700/50 font-mono">Ci·Q / (X·V)</span>
+                        </div>
+                        <div class="mt-1 flex items-baseline gap-2">
+                            <span id="card_fm" class="text-2xl font-bold font-mono text-emerald-400">0.397</span>
+                            <span class="text-[10px] text-slate-400">kg BOD/kg VSS·d</span>
+                        </div>
+                        <div class="flex items-center gap-1.5 mt-1">
+                            <span id="badge_fm_status" class="w-2 h-2 rounded-full bg-emerald-400"></span>
+                            <span id="text_fm_status" class="text-[10px] text-emerald-300 font-medium">정상 운전 (0.2~0.4)</span>
+                        </div>
+                        <div class="text-[9.5px] text-slate-400 mt-0.5">표준설계 기준: 0.2 ~ 0.4</div>
+                    </div>
+
+                    <!-- Card 3: SRT (슬러지 일령) -->
+                    <div class="glass-panel p-3 rounded-xl border border-slate-700/70 shadow-2xl pointer-events-auto">
+                        <div class="flex items-center justify-between text-slate-300 text-xs">
+                            <span class="font-bold text-slate-100">슬러지 일령 (<span class="text-amber-300 font-mono">SRT</span>)</span>
+                            <span class="text-[10px] text-amber-300 bg-amber-950/80 px-1.5 py-0.5 rounded border border-amber-700/50 font-mono">θc (일령)</span>
+                        </div>
+                        <div class="mt-1 flex items-baseline gap-2">
+                            <span id="card_srt" class="text-2xl font-bold font-mono text-amber-400">4.8</span>
+                            <span class="text-xs text-slate-300">일 (days)</span>
+                        </div>
+                        <div class="flex items-center gap-1.5 mt-1">
+                            <span id="badge_srt_status" class="w-2 h-2 rounded-full bg-emerald-400"></span>
+                            <span id="text_srt_status" class="text-[10px] text-emerald-300 font-medium">적정 일령 (3~6 일)</span>
+                        </div>
+                        <div class="text-[9.5px] text-slate-400 mt-0.5">표준설계 기준: 3.0 ~ 6.0 일</div>
+                    </div>
+
+                    <!-- Card 4: SVI & SDI -->
+                    <div class="glass-panel p-3 rounded-xl border border-slate-700/70 shadow-2xl pointer-events-auto">
+                        <div class="flex items-center justify-between text-slate-300 text-xs">
+                            <span class="font-bold text-slate-100">슬러지 지수 (<span class="text-purple-300 font-mono">SVI</span>)</span>
+                            <span class="text-[10px] text-purple-300 bg-purple-950/80 px-1.5 py-0.5 rounded border border-purple-700/50 font-mono">10⁶ / Xr</span>
+                        </div>
+                        <div class="mt-1 flex items-baseline gap-2">
+                            <span id="card_svi" class="text-2xl font-bold font-mono text-purple-400">125.0</span>
+                            <span class="text-xs text-slate-300">mL/g</span>
+                            <span class="text-xs font-mono text-slate-400 ml-1">| SDI: <span id="card_sdi" class="text-purple-300 font-bold">0.80</span></span>
+                        </div>
+                        <div class="flex items-center gap-1.5 mt-1">
+                            <span id="badge_svi_status" class="w-2 h-2 rounded-full bg-emerald-400"></span>
+                            <span id="text_svi_status" class="text-[10px] text-emerald-300 font-medium">정상 상태 (50~150)</span>
+                        </div>
+                        <div class="text-[9.5px] text-slate-400 mt-0.5">&lt;50 핀플록 | 50~150 정상 | &gt;200 벌킹</div>
+                    </div>
+
+                </div>
+
+            </div>
+        </main>
+
+        <!-- Right Drawer: Comprehensive Calculations & Analysis Panel -->
+        <aside class="w-80 md:w-96 glass-panel border-l border-slate-800/80 flex flex-col shrink-0 z-10 overflow-hidden">
+            <div class="p-3 border-b border-slate-800/80 flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                    <i data-lucide="calculator" class="w-4 h-4 text-emerald-400"></i>
+                    <span class="text-xs font-bold text-slate-100 uppercase tracking-wider">공정 상세 계산 & 물질수지</span>
+                </div>
+                <span class="text-[10px] bg-dark-850 text-cyan-300 px-2 py-0.5 rounded border border-cyan-800/60 font-medium">실시간 연동</span>
+            </div>
+
+            <div class="flex-1 overflow-y-auto p-3 space-y-4 text-xs">
+                
+                <!-- 1. 미생물 생장 물질 수지 검증 박스 -->
+                <div class="glass-card p-3 rounded-xl border border-slate-800">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="font-bold text-slate-100 flex items-center gap-1.5">
+                            <i data-lucide="scale" class="w-3.5 h-3.5 text-cyan-400"></i> 미생물 물질수지 검증식
+                        </span>
+                        <span class="text-[10px] text-cyan-400 font-mono bg-cyan-950/60 px-1.5 py-0.5 rounded">Steady-State</span>
+                    </div>
+                    
+                    <!-- 인간 친화적 KaTeX 렌더링 카드 -->
+                    <div class="bg-dark-950/90 p-3 rounded-lg border border-slate-800 text-center mb-2 shadow-inner">
+                        <div class="math-container text-cyan-300 font-medium">
+                            $$\frac{Q_w X_w}{X V} = \frac{Y(C_i - C_o)Q}{X V} - k_d$$
+                        </div>
+                        <div class="text-[10px] text-slate-400 mt-2 flex justify-around border-t border-slate-800/80 pt-1.5">
+                            <div>좌변(비증식속도 $\mu_{net}$): <b id="val_balance_left" class="text-emerald-400 font-mono">0.0856</b> $d^{-1}$</div>
+                            <div>우변(성장 - 사멸): <b id="val_balance_right" class="text-emerald-400 font-mono">0.0856</b> $d^{-1}$</div>
+                        </div>
+                    </div>
+                    
+                    <div class="space-y-1.5 text-[11px] text-slate-300">
+                        <div class="flex justify-between">
+                            <span class="text-slate-400">총 합성량 [$Y(C_i - C_o)Q$]:</span>
+                            <span class="font-mono text-slate-100 font-semibold"><span id="val_gross_growth">508.75</span> kg/d</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-slate-400">내생 호흡 소모량 [$k_d \cdot X \cdot V$]:</span>
+                            <span class="font-mono text-slate-100 font-semibold"><span id="val_endog_decay">187.50</span> kg/d</span>
+                        </div>
+                        <div class="flex justify-between text-cyan-300 font-semibold pt-1 border-t border-slate-800">
+                            <span>순 슬러지 생성량 ($P_x = Q_w X_w$):</span>
+                            <span class="font-mono font-bold"><span id="val_net_sludge_px">321.25</span> kg/d</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 2. 슬러지 체류시간 (SRT) 상세 분석 -->
+                <div class="glass-card p-3 rounded-xl border border-slate-800">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="font-bold text-slate-100 flex items-center gap-1.5">
+                            <i data-lucide="clock" class="w-3.5 h-3.5 text-amber-400"></i> 고형물 체류시간 (SRT) 산정
+                        </span>
+                        <span class="text-[10px] text-amber-300 font-mono">$\theta_c$ (일령)</span>
+                    </div>
+
+                    <div class="bg-dark-950/90 p-3 rounded-lg border border-slate-800 text-center mb-2 shadow-inner">
+                        <div class="math-container text-amber-300 font-medium">
+                            $$\text{SRT} = \frac{V \cdot X}{X_r \cdot Q_w + (Q - Q_w)X_e}$$
+                        </div>
+                        <div class="text-[10px] text-slate-400 mt-1">
+                            $\text{SRT} = \frac{\text{포기조 내 총 슬러지량 (kg)}}{\text{계통 밖 배출 슬러지량 (kg/d)}}$
+                        </div>
+                    </div>
+
+                    <div class="space-y-1.5 text-[11px] text-slate-300">
+                        <div class="flex justify-between">
+                            <span class="text-slate-400">포기조 총 미생물량 ($V \cdot X$):</span>
+                            <span class="font-mono text-slate-100 font-semibold"><span id="val_total_tank_sludge">3750.0</span> kg</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-slate-400">잉여슬러지 배출량 ($X_r \cdot Q_w$):</span>
+                            <span class="font-mono text-slate-100 font-semibold"><span id="val_waste_sludge_mass">321.3</span> kg/d</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-slate-400">처리수 동반 유출량 ($Q_e \cdot X_e$):</span>
+                            <span class="font-mono text-slate-100 font-semibold"><span id="val_effluent_sludge_mass">49.6</span> kg/d</span>
+                        </div>
+                        <div class="flex justify-between text-amber-300 font-semibold pt-1 border-t border-slate-800">
+                            <span>최종 산정 SRT ($\theta_c$):</span>
+                            <span class="font-mono font-bold"><span id="val_calc_srt_days">10.11</span> 일 (Days)</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 3. SVI 및 SDI 관계 분석 -->
+                <div class="glass-card p-3 rounded-xl border border-slate-800">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="font-bold text-slate-100 flex items-center gap-1.5">
+                            <i data-lucide="test-tube" class="w-3.5 h-3.5 text-purple-400"></i> SVI & SDI 침강 특성
+                        </span>
+                        <span class="text-[10px] text-purple-300 font-mono">침강성 지표</span>
+                    </div>
+
+                    <div class="bg-dark-950/90 p-3 rounded-lg border border-slate-800 text-center mb-2 shadow-inner">
+                        <div class="math-container text-purple-300 font-medium">
+                            $$\text{SVI} = \frac{10^6}{X_r} = \frac{100}{\text{SDI}}$$
+                        </div>
+                        <div class="text-[10px] text-slate-400 mt-1">
+                            침전지 바닥 완전 침전 슬러지층 농도 = 반송슬러지 농도($X_r$) 가정
+                        </div>
+                    </div>
+
+                    <div class="space-y-1.5 text-[11px] text-slate-300">
+                        <div class="flex justify-between">
+                            <span class="text-slate-400">슬러지 용량 지수 (SVI):</span>
+                            <span class="font-mono text-purple-300 font-bold"><span id="val_detail_svi">117.65</span> mL/g</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-slate-400">슬러지 밀도 지수 (SDI):</span>
+                            <span class="font-mono text-purple-300 font-bold"><span id="val_detail_sdi">0.850</span> g/100mL</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-slate-400">추정 30분 침강부피 ($SV_{30}$):</span>
+                            <span class="font-mono text-slate-100 font-semibold"><span id="val_sv30">29.4</span> %</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 4. 체류시간(HRT) 및 BOD 제거율 -->
+                <div class="glass-card p-3 rounded-xl border border-slate-800">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="font-bold text-slate-100 flex items-center gap-1.5">
+                            <i data-lucide="check-circle" class="w-3.5 h-3.5 text-emerald-400"></i> 반응조 용적 & 체류시간 ($t$)
+                        </span>
+                    </div>
+                    
+                    <div class="bg-dark-950/90 p-2.5 rounded-lg border border-slate-800 text-center mb-2 text-xs">
+                        <div class="text-cyan-300 font-medium font-mono">
+                            $$t = \frac{V}{Q} \quad (\text{시간} = t \times 24)$$
+                        </div>
+                    </div>
+
+                    <div class="space-y-2 text-[11px]">
+                        <div>
+                            <div class="flex justify-between text-slate-300 mb-1">
+                                <span>BOD 유기물 제거 효율 ($\eta$):</span>
+                                <span class="font-mono text-emerald-400 font-bold" id="val_bod_removal">92.5%</span>
+                            </div>
+                            <div class="w-full bg-slate-900 h-2 rounded-full overflow-hidden border border-slate-700/60">
+                                <div id="bar_bod_removal" class="bg-gradient-to-r from-cyan-500 to-emerald-400 h-full rounded-full transition-all duration-300" style="width: 92.5%"></div>
+                            </div>
+                        </div>
+                        <div class="flex justify-between text-slate-300 pt-1 border-t border-slate-800">
+                            <span>포기조 BOD 용적부하 ($L_v$):</span>
+                            <span class="font-mono text-slate-100 font-semibold"><span id="val_volumetric_load">0.67</span> kg BOD/m³·d</span>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </aside>
+
+    </div>
+
+    <!-- Modal: Theoretical Derivations & Diagrams -->
+    <div id="theoryModal" class="fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex items-center justify-center hidden p-4">
+        <div class="bg-dark-900 border border-slate-700/80 rounded-2xl max-w-3xl w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
+            
+            <!-- Modal Header -->
+            <div class="p-4 border-b border-slate-800 bg-dark-950/70 flex items-center justify-between">
+                <div class="flex items-center gap-2.5">
+                    <div class="w-8 h-8 rounded-lg bg-cyan-500/20 text-cyan-300 flex items-center justify-center border border-cyan-500/30">
+                        <i data-lucide="book-open" class="w-4 h-4"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-sm font-bold text-white">활성슬러지 공법 수식 및 공학 이론 유도</h3>
+                        <p class="text-[11px] text-slate-400">교재 및 도면 기반의 표준 공식 유도 과정 정리</p>
+                    </div>
+                </div>
+                <button id="btnCloseTheory" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+
+            <!-- Modal Content -->
+            <div class="p-6 overflow-y-auto space-y-6 text-xs text-slate-200">
+                
+                <!-- 1. 체류시간(t) & F/M비 -->
+                <div class="border border-slate-800/90 bg-dark-950/80 p-4 rounded-xl shadow-inner">
+                    <h4 class="text-sm font-bold text-cyan-400 mb-2 flex items-center gap-2">
+                        1. 수리학적 체류시간 ($t$) 및 F/M 비 (Food to Microorganism Ratio)
+                    </h4>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-2">
+                        <div class="bg-dark-900 p-3 rounded-lg text-center border border-slate-800">
+                            <span class="text-[11px] text-slate-400 block mb-1">체류시간 (HRT, $t$)</span>
+                            <div class="text-sm text-cyan-300">
+                                $$t = \frac{V}{Q} \quad (\text{단위: 일, day})$$
+                            </div>
+                        </div>
+                        <div class="bg-dark-900 p-3 rounded-lg text-center border border-slate-800">
+                            <span class="text-[11px] text-slate-400 block mb-1">F/M 비 (BOD 슬러지 부하)</span>
+                            <div class="text-sm text-cyan-300">
+                                $$\text{F/M 비} = \frac{\text{BOD} \times Q}{\text{MLSS} \times V} = \frac{C_i \cdot Q}{X \cdot V}$$
+                            </div>
+                        </div>
+                    </div>
+                    <ul class="list-disc list-inside space-y-1 text-slate-300 text-[11px] pl-1">
+                        <li><b>체류시간 (HRT, $t$) 기준:</b> 표준 활성슬러지법 기준 <b>$6 \sim 8\text{ hr}$</b>. ($&lt; 6\text{ hr}$ 미달 시 단락류 및 유기물 미처리 위험, $&gt; 8\text{ hr}$ 초과 시 포기 동력비 낭비 및 슬러지 과도 산화)</li>
+                        <li><b>F/M 비 기준:</b> 표준 활성슬러지법 기준 <b>$0.2 \sim 0.4\text{ kg BOD/kg VSS}\cdot\text{d}$</b>. ($&lt; 0.2$ 저부하 시 미세 플록 분산 및 탁도 악화, $&gt; 0.4$ 과부하 시 산소 결핍 및 미처리 유출)</li>
+                    </ul>
+                </div>
+
+                <!-- 2. SVI 및 SDI 유도 과정 -->
+                <div class="border border-slate-800/90 bg-dark-950/80 p-4 rounded-xl shadow-inner">
+                    <h4 class="text-sm font-bold text-purple-400 mb-2 flex items-center gap-2">
+                        2. 슬러지 용량 지수(SVI) 및 침강 특성 판정 기준
+                    </h4>
+                    <div class="bg-dark-900 p-3 rounded-lg text-center border border-slate-800 mb-3 text-sm text-purple-300">
+                        $$\text{SVI} = \frac{\text{SV}_{30}\text{ (mL/L)} \times 10^3}{\text{MLSS (mg/L)}} = \frac{10^6}{X_r} = \frac{100}{\text{SDI}}$$
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-[11px] text-slate-300 mb-3">
+                        <div class="bg-dark-900/90 p-3 rounded-lg border border-slate-800">
+                            <span class="text-purple-300 font-bold block mb-1">반송슬러지 농도($X_r$)와의 질량보존 관계</span>
+                            침전지 하부에서 침전 완료된 슬러지 층의 농도는 반송슬러지 농도($X_r$)와 같다고 가정할 때:
+                            <div class="font-mono text-purple-200 mt-1.5 p-2 bg-dark-950 rounded border border-slate-800 text-center">
+                                $$X_r \times \frac{\text{SV}}{1000} = \text{MLSS} \implies \text{SVI} = \frac{10^6}{X_r}$$
+                            </div>
+                        </div>
+                        <div class="bg-dark-900/90 p-3 rounded-lg border border-slate-800">
+                            <span class="text-purple-300 font-bold block mb-1">슬러지 밀도 지수 (SDI)</span>
+                            SDI는 100mL 침전 슬러지 내의 건조 고형물 질량(g)을 의미합니다:
+                            <div class="font-mono text-purple-200 mt-1.5 p-2 bg-dark-950 rounded border border-slate-800 text-center">
+                                $$\text{SDI} = \frac{100}{\text{SVI}} = \frac{X_r}{10^4} \quad [\text{g/100mL}]$$
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-slate-900/80 p-3 rounded-lg border border-slate-800 text-[11px] space-y-1">
+                        <span class="font-bold text-amber-300 block mb-1">SVI 수치에 따른 슬러지 상태 판정 기준:</span>
+                        <div>• <b>$\text{SVI} &lt; 50\text{ mL/g}$:</b> <span class="text-cyan-300 font-medium">핀 플록(Pin-floc) 현상</span> (슬러지가 지나치게 치밀하여 빠르게 가라앉으나, 미세 플록이 상등수에 잔류하여 유출수 탁도 증가)</div>
+                        <div>• <b>$50 \le \text{SVI} \le 150\text{ mL/g}$:</b> <span class="text-emerald-300 font-medium">정상 상태 (우수한 침강성)</span> (압밀성과 청징도가 가장 이상적인 최적 운전 조건)</div>
+                        <div>• <b>$150 &lt; \text{SVI} \le 200\text{ mL/g}$:</b> <span class="text-amber-300 font-medium">침강 지연 주의</span> (침전지 표면부하율 초과 시 고형물 월류 가능성)</div>
+                        <div>• <b>$\text{SVI} &gt; 200\text{ mL/g}$:</b> <span class="text-rose-400 font-medium">슬러지 벌킹(Sludge Bulking, 팽화 현상 발생)</span> (사상균 과다 증식 또는 결합 불량으로 슬러지가 가라앉지 않고 월류)</div>
+                    </div>
+                </div>
+
+                <!-- 3. SRT (고형물 체류시간) 유도 -->
+                <div class="border border-slate-800/90 bg-dark-950/80 p-4 rounded-xl shadow-inner">
+                    <h4 class="text-sm font-bold text-amber-400 mb-2 flex items-center gap-2">
+                        3. 고형물 체류시간 (SRT: Sludge Retention Time, $\theta_c$)
+                    </h4>
+                    <div class="bg-dark-900 p-3 rounded-lg text-center border border-slate-800 mb-2 text-sm text-amber-300">
+                        $$\text{SRT } (\theta_c) = \frac{\text{포기조내 전체 슬러지량}}{\text{포기조에서 유출되는 슬러지량}} = \frac{V \cdot X}{X_r \cdot Q_w + (Q - Q_w)X_e}$$
+                    </div>
+                    <p class="text-slate-300 text-[11px] leading-relaxed">
+                        표준 활성슬러지법 설계 기준 슬러지 일령은 <b>$3 \sim 6\text{ 일(days)}$</b>입니다. 3일 미만일 경우 세대 시간이 긴 미생물이 씻겨 나가는 슬러지 유실(Washout)이 발생하며, 6일을 초과할 경우 내생호흡에 의한 노화 슬러지화 및 핀 플록이 발생할 수 있습니다.
+                    </p>
+                </div>
+
+                <!-- 4. 미생물 생장 물질수지 방정식 -->
+                <div class="border border-slate-800/90 bg-dark-950/80 p-4 rounded-xl shadow-inner">
+                    <h4 class="text-sm font-bold text-emerald-400 mb-2 flex items-center gap-2">
+                        4. 포기조 미생물 정상상태 (Steady-State) 물질수지
+                    </h4>
+                    <div class="bg-dark-900 p-3 rounded-lg text-center border border-slate-800 mb-2 text-sm text-emerald-300">
+                        $$\frac{Q_w X_w}{X V} = \frac{Y(C_i - C_o)Q}{X V} - k_d \iff \frac{1}{\text{SRT}} \approx \frac{Y(C_i - C_o)}{X \cdot t} - k_d$$
+                    </div>
+                    <p class="text-slate-300 text-[11px] leading-relaxed">
+                        미생물의 일일 순증식량($Q_w X_w$)은 기질(BOD) 섭취에 의한 합성 수율($Y$)에서 내생호흡 및 사멸($k_d$)에 따른 감쇄량을 뺀 값과 정확하게 균형을 이룹니다.
+                    </p>
+                </div>
+
+            </div>
+
+            <!-- Modal Footer -->
+            <div class="p-3 border-t border-slate-800 bg-dark-950/90 flex justify-end">
+                <button id="btnCloseTheoryBottom" class="px-4 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium transition">
+                    닫기
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        /* ==========================================================================
+           1. SIMULATION STATE & PARAMETERS DEFINITION
+           ========================================================================== */
+        const state = {
+            // Inputs (Tuned to fit standard design parameters: HRT 6-8hr, F/M 0.2-0.4, SRT 3-6d, SVI 50-150)
+            Q: 5000,       // 유입유량 (m3/d)
+            V: 1400,       // 포기조 부피 (m3) -> HRT = 6.72 hr
+            X: 1800,       // MLVSS (mg/L) -> F/M = 0.397
+            Ci: 200,       // 유입 BOD (mg/L)
+            Co: 15,        // 유출 BOD (mg/L)
+            Y: 0.65,       // 슬러지 수율 (kg VSS/kg BOD)
+            kd: 0.05,      // 내생호흡계수 (1/d)
+            Xr: 8000,      // 반송슬러지 농도 (mg/L) -> SVI = 125 mL/g
+            Qr: 2500,      // 반송유량 (m3/d)
+            Xe: 10,        // 유출수 SS 농도 (mg/L)
+            
+            // Calculated
+            Qw: 59.4,      // 잉여슬러지 배출유량 (m3/d)
+            Qe: 4940.6,    // 유출수 유량 (m3/d)
+            t_hr: 6.72,    // HRT 체류시간 (시간)
+            t_day: 0.28,   // HRT 체류시간 (일)
+            fm: 0.397,     // F/M비
+            srt: 4.80,     // SRT (일)
+            svi: 125.0,    // SVI (mL/g)
+            sdi: 0.80,     // SDI (g/100mL)
+            bod_removal: 92.5, // BOD 제거율 (%)
+            
+            // Simulation Controls
+            isRunning: true,
+            showBubbles: true,
+            simSpeed: 1.0
+        };
+
+        /* ==========================================================================
+           2. PROCESS MATHEMATICAL ENGINE & BALANCE CALCULATIONS
+           ========================================================================== */
+        function calculateProcess() {
+            // 1. 수리학적 체류시간 t (HRT)
+            state.t_day = state.V / state.Q;
+            state.t_hr = state.t_day * 24.0;
+
+            // 2. F/M 비 = (BOD * Q) / (MLSS * V) = (Ci * Q) / (X * V)
+            state.fm = (state.Ci * state.Q) / (state.X * state.V);
+
+            // 3. 미생물 물질수지 (Steady-State Net Sludge Production)
+            const grossGrowth = state.Y * (state.Ci - state.Co) * state.Q / 1000.0; // kg/d
+            const endogDecay = state.kd * state.X * state.V / 1000.0;             // kg/d
+            let Px = grossGrowth - endogDecay;                                     // kg/d (순 생성 슬러지)
+            if (Px < 1.0) Px = 1.0;
+
+            // Qw 배출 유량 = Px / (Xr / 1000)
+            state.Qw = (Px * 1000.0) / state.Xr; // m3/d
+            state.Qe = state.Q - state.Qw;       // m3/d
+
+            // 4. 슬러지 체류시간 SRT (θc)
+            const totalMassInTank = (state.V * state.X) / 1000.0; // kg
+            const wasteMassPerDay = (state.Xr * state.Qw) / 1000.0; // kg/d
+            const effluentMassPerDay = (state.Qe * state.Xe) / 1000.0; // kg/d
+            const totalDailySludgeExit = wasteMassPerDay + effluentMassPerDay;
+            state.srt = totalDailySludgeExit > 0 ? (totalMassInTank / totalDailySludgeExit) : 0;
+
+            // 5. 슬러지 용량 지수 SVI = 10^6 / Xr (mL/g)
+            state.svi = 1000000.0 / state.Xr;
+
+            // 6. 슬러지 밀도 지수 SDI = 100 / SVI = Xr / 10000
+            state.sdi = 100.0 / state.svi;
+
+            // 7. BOD 제거율
+            state.bod_removal = ((state.Ci - state.Co) / state.Ci) * 100.0;
+
+            // 8. 반송비
+            const returnRatio = (state.Qr / state.Q) * 100.0;
+
+            // Update UI Displays
+            updateUIDisplays({
+                grossGrowth,
+                endogDecay,
+                Px,
+                totalMassInTank,
+                wasteMassPerDay,
+                effluentMassPerDay,
+                returnRatio
+            });
+        }
+
+        function updateUIDisplays(details) {
+            // Value Labels
+            document.getElementById('val_Q').innerText = state.Q.toLocaleString();
+            document.getElementById('val_V').innerText = state.V.toLocaleString();
+            document.getElementById('val_X').innerText = state.X.toLocaleString();
+            document.getElementById('val_Ci').innerText = state.Ci;
+            document.getElementById('val_Co').innerText = state.Co;
+            document.getElementById('val_Y').innerText = state.Y.toFixed(2);
+            document.getElementById('val_kd').innerText = state.kd.toFixed(3);
+            document.getElementById('val_Xr').innerText = state.Xr.toLocaleString();
+            document.getElementById('val_Qr').innerText = state.Qr.toLocaleString();
+            document.getElementById('val_Xe').innerText = state.Xe;
+            document.getElementById('val_Qw').innerText = state.Qw.toFixed(1);
+            document.getElementById('val_Qe').innerText = state.Qe.toFixed(1);
+            document.getElementById('val_R_ratio').innerText = details.returnRatio.toFixed(1) + '%';
+
+            // HUD Card 1: HRT (t) 진단 (표준: 6~8 hr)
+            document.getElementById('card_t_hr').innerText = state.t_hr.toFixed(1);
+            document.getElementById('card_t_day').innerText = state.t_day.toFixed(2);
+            const badgeHrt = document.getElementById('badge_hrt_status');
+            const textHrt = document.getElementById('text_hrt_status');
+            if (state.t_hr >= 6.0 && state.t_hr <= 8.0) {
+                badgeHrt.className = "w-2 h-2 rounded-full bg-emerald-400";
+                textHrt.className = "text-[10px] text-emerald-300 font-medium";
+                textHrt.innerText = "적정 체류 (6~8 hr)";
+            } else if (state.t_hr < 6.0) {
+                badgeHrt.className = "w-2 h-2 rounded-full bg-rose-500 animate-pulse";
+                textHrt.className = "text-[10px] text-rose-300 font-medium";
+                textHrt.innerText = "체류 부족 (< 6 hr, 단락류 위험)";
+            } else {
+                badgeHrt.className = "w-2 h-2 rounded-full bg-amber-400";
+                textHrt.className = "text-[10px] text-amber-300 font-medium";
+                textHrt.innerText = "과잉 체류 (> 8 hr, 동력 낭비)";
+            }
+
+            // HUD Card 2: F/M 비 진단 (표준: 0.2~0.4)
+            document.getElementById('card_fm').innerText = state.fm.toFixed(3);
+            const badgeFm = document.getElementById('badge_fm_status');
+            const textFm = document.getElementById('text_fm_status');
+            if (state.fm >= 0.2 && state.fm <= 0.4) {
+                badgeFm.className = "w-2 h-2 rounded-full bg-emerald-400";
+                textFm.className = "text-[10px] text-emerald-300 font-medium";
+                textFm.innerText = "정상 운전 (0.2~0.4)";
+            } else if (state.fm < 0.2) {
+                badgeFm.className = "w-2 h-2 rounded-full bg-amber-400";
+                textFm.className = "text-[10px] text-amber-300 font-medium";
+                textFm.innerText = "저부하 (< 0.2, 미세플록/자기산화)";
+            } else {
+                badgeFm.className = "w-2 h-2 rounded-full bg-rose-500 animate-pulse";
+                textFm.className = "text-[10px] text-rose-300 font-medium";
+                textFm.innerText = "과부하 (> 0.4, DO 결핍 위험)";
+            }
+
+            // HUD Card 3: SRT 진단 (표준: 3~6 day)
+            document.getElementById('card_srt').innerText = state.srt.toFixed(1);
+            const badgeSrt = document.getElementById('badge_srt_status');
+            const textSrt = document.getElementById('text_srt_status');
+            if (state.srt >= 3.0 && state.srt <= 6.0) {
+                badgeSrt.className = "w-2 h-2 rounded-full bg-emerald-400";
+                textSrt.className = "text-[10px] text-emerald-300 font-medium";
+                textSrt.innerText = "적정 일령 (3~6 일)";
+            } else if (state.srt < 3.0) {
+                badgeSrt.className = "w-2 h-2 rounded-full bg-rose-500 animate-pulse";
+                textSrt.className = "text-[10px] text-rose-300 font-medium";
+                textSrt.innerText = "미달 위험 (< 3 일, Washout)";
+            } else {
+                badgeSrt.className = "w-2 h-2 rounded-full bg-amber-400";
+                textSrt.className = "text-[10px] text-amber-300 font-medium";
+                textSrt.innerText = "과다 일령 (> 6 일, 노화 슬러지)";
+            }
+            
+            // HUD Card 4: SVI & SDI 진단 (<50 핀플록, 50~150 정상, >200 슬러지 벌킹)
+            document.getElementById('card_svi').innerText = state.svi.toFixed(1);
+            document.getElementById('card_sdi').innerText = state.sdi.toFixed(2);
+            const badgeSvi = document.getElementById('badge_svi_status');
+            const textSvi = document.getElementById('text_svi_status');
+            if (state.svi < 50) {
+                badgeSvi.className = "w-2 h-2 rounded-full bg-cyan-400";
+                textSvi.className = "text-[10px] text-cyan-300 font-medium";
+                textSvi.innerText = "핀 플록 현상 발생 (< 50)";
+            } else if (state.svi >= 50 && state.svi <= 150) {
+                badgeSvi.className = "w-2 h-2 rounded-full bg-emerald-400";
+                textSvi.className = "text-[10px] text-emerald-300 font-medium";
+                textSvi.innerText = "정상 상태 (50~150, 우수)";
+            } else if (state.svi > 150 && state.svi <= 200) {
+                badgeSvi.className = "w-2 h-2 rounded-full bg-amber-400";
+                textSvi.className = "text-[10px] text-amber-300 font-medium";
+                textSvi.innerText = "침강 지연 주의 (150~200)";
+            } else {
+                badgeSvi.className = "w-2 h-2 rounded-full bg-rose-500 animate-pulse";
+                textSvi.className = "text-[10px] text-rose-300 font-semibold";
+                textSvi.innerText = "슬러지 벌킹 발생 (> 200 팽화)";
+            }
+
+            // Right Panel Details
+            document.getElementById('val_balance_left').innerText = (1.0 / (state.srt || 1)).toFixed(4);
+            document.getElementById('val_balance_right').innerText = ((state.Y * (state.Ci - state.Co) * state.Q) / (state.X * state.V) - state.kd).toFixed(4);
+            
+            document.getElementById('val_gross_growth').innerText = details.grossGrowth.toFixed(1);
+            document.getElementById('val_endog_decay').innerText = details.endogDecay.toFixed(1);
+            document.getElementById('val_net_sludge_px').innerText = details.Px.toFixed(1);
+
+            document.getElementById('val_total_tank_sludge').innerText = details.totalMassInTank.toFixed(1);
+            document.getElementById('val_waste_sludge_mass').innerText = details.wasteMassPerDay.toFixed(1);
+            document.getElementById('val_effluent_sludge_mass').innerText = details.effluentMassPerDay.toFixed(1);
+            document.getElementById('val_calc_srt_days').innerText = state.srt.toFixed(2);
+
+            document.getElementById('val_detail_svi').innerText = state.svi.toFixed(2);
+            document.getElementById('val_detail_sdi').innerText = state.sdi.toFixed(3);
+            const sv30 = (state.svi * (state.X / 1000.0) / 10.0);
+            document.getElementById('val_sv30').innerText = Math.min(sv30, 99.9).toFixed(1);
+
+            document.getElementById('val_bod_removal').innerText = state.bod_removal.toFixed(1) + '%';
+            document.getElementById('bar_bod_removal').style.width = Math.min(Math.max(state.bod_removal, 0), 100) + '%';
+            
+            const volLoad = (state.Ci * state.Q) / (state.V * 1000.0);
+            document.getElementById('val_volumetric_load').innerText = volLoad.toFixed(2);
+        }
+
+        /* ==========================================================================
+           3. THREE.JS 3D SCENE ARCHITECTURE & SIMULATION ENGINE
+           ========================================================================== */
+        let scene, camera, renderer, controls;
+        let clarifierScraperMesh;
+        const bubbleParticles = [];
+        const flocParticles = [];         // 포기조 황갈색 미생물 플록 입자군
+        const settlingParticles = [];     // 침전지 침강 슬러지 입자군
+        const flowParticleSystems = [];
+
+        function initThree() {
+            const container = document.getElementById('canvas-container');
+            const width = container.clientWidth;
+            const height = container.clientHeight;
+
+            // Scene with deep sleek fog
+            scene = new THREE.Scene();
+            scene.fog = new THREE.FogExp2(0x050811, 0.016);
+
+            // Camera
+            camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 1000);
+            camera.position.set(-28, 22, 34);
+
+            // Renderer
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer.setSize(width, height);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            container.appendChild(renderer.domElement);
+
+            // Controls
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            controls.maxPolarAngle = Math.PI / 2 - 0.02;
+            controls.minDistance = 10;
+            controls.maxDistance = 85;
+            controls.target.set(0, 2.5, 0);
+
+            // Lighting Setup for Refined Aesthetics
+            const ambientLight = new THREE.AmbientLight(0xdbeafe, 0.75);
+            scene.add(ambientLight);
+
+            const dirLight = new THREE.DirectionalLight(0xffffff, 1.4);
+            dirLight.position.set(30, 45, 25);
+            dirLight.castShadow = true;
+            dirLight.shadow.mapSize.width = 2048;
+            dirLight.shadow.mapSize.height = 2048;
+            dirLight.shadow.bias = -0.0001;
+            scene.add(dirLight);
+
+            // Subtle cyan rim accent light
+            const accentLight = new THREE.PointLight(0x06b6d4, 2.0, 40);
+            accentLight.position.set(-11, 10, 5);
+            scene.add(accentLight);
+
+            const warmAccentLight = new THREE.PointLight(0xd97706, 1.2, 35);
+            warmAccentLight.position.set(11, 8, -5);
+            scene.add(warmAccentLight);
+
+            // Ground Concrete Platform with Modern Dark Slate Tile Tone
+            createGroundPlatform();
+
+            // Build Facilities
+            buildAerationTank();
+            buildSecondaryClarifier();
+            buildPipingNetwork();
+            initFlowParticles();
+
+            // Window Resize
+            window.addEventListener('resize', onWindowResize);
+        }
+
+        function createGroundPlatform() {
+            const floorGeo = new THREE.BoxGeometry(64, 1.2, 54);
+            const floorMat = new THREE.MeshStandardMaterial({
+                color: 0x0f172a,
+                roughness: 0.85,
+                metalness: 0.15
+            });
+            const floor = new THREE.Mesh(floorGeo, floorMat);
+            floor.position.y = -0.6;
+            floor.receiveShadow = true;
+            scene.add(floor);
+
+            // Refined Grid
+            const gridHelper = new THREE.GridHelper(64, 44, 0x1e293b, 0x0a1120);
+            gridHelper.position.y = 0.01;
+            scene.add(gridHelper);
+        }
+
+        function buildAerationTank() {
+            const tankGroup = new THREE.Group();
+            tankGroup.position.set(-11, 0, 0);
+
+            const tankW = 14, tankH = 8, tankD = 10;
+            const wallThick = 0.6;
+
+            const concreteMat = new THREE.MeshStandardMaterial({
+                color: 0x334155,
+                roughness: 0.7,
+                metalness: 0.25
+            });
+
+            // Base Slab
+            const bottom = new THREE.Mesh(new THREE.BoxGeometry(tankW, wallThick, tankD), concreteMat);
+            bottom.position.y = wallThick / 2;
+            bottom.receiveShadow = true;
+            tankGroup.add(bottom);
+
+            // Back Wall
+            const backWall = new THREE.Mesh(new THREE.BoxGeometry(tankW, tankH, wallThick), concreteMat);
+            backWall.position.set(0, tankH / 2, -tankD / 2 + wallThick / 2);
+            backWall.castShadow = true;
+            backWall.receiveShadow = true;
+            tankGroup.add(backWall);
+
+            // Left Wall
+            const leftWall = new THREE.Mesh(new THREE.BoxGeometry(wallThick, tankH, tankD), concreteMat);
+            leftWall.position.set(-tankW / 2 + wallThick / 2, tankH / 2, 0);
+            leftWall.castShadow = true;
+            tankGroup.add(leftWall);
+
+            // Right Baffle Wall
+            const rightWall = new THREE.Mesh(new THREE.BoxGeometry(wallThick, tankH, tankD), concreteMat);
+            rightWall.position.set(tankW / 2 - wallThick / 2, tankH / 2, 0);
+            tankGroup.add(rightWall);
+
+            // Front Inspection Glass (내부 기포 및 미생물 플록 관찰용)
+            const glassMat = new THREE.MeshPhysicalMaterial({
+                color: 0xa5f3fc,
+                transparent: true,
+                opacity: 0.25,
+                roughness: 0.05,
+                transmission: 0.9,
+                thickness: 0.6,
+                ior: 1.48
+            });
+            const frontGlass = new THREE.Mesh(new THREE.BoxGeometry(tankW - 0.2, tankH, 0.2), glassMat);
+            frontGlass.position.set(0, tankH / 2, tankD / 2 - 0.1);
+            tankGroup.add(frontGlass);
+
+            // Aerated Mixed Liquor Fluid Body (황갈색 혼합액 본체)
+            const waterGeo = new THREE.BoxGeometry(tankW - 1.2, tankH - 1.1, tankD - 1.2);
+            const waterMat = new THREE.MeshStandardMaterial({
+                color: 0xa16207,
+                transparent: true,
+                opacity: 0.45,
+                roughness: 0.3,
+                metalness: 0.05
+            });
+            const waterMesh = new THREE.Mesh(waterGeo, waterMat);
+            waterMesh.position.set(0, (tankH - 1.1) / 2 + 0.35, 0);
+            waterMesh.name = "aerationWater";
+            tankGroup.add(waterMesh);
+
+            // Fine-Bubble Aeration Grid & Disc Diffusers (산기판 디스크망)
+            const pipeM = new THREE.MeshStandardMaterial({ color: 0x94a3b8, metalness: 0.85, roughness: 0.2 });
+            const mainAirPipe = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, tankD - 2.2), pipeM);
+            mainAirPipe.rotation.x = Math.PI / 2;
+            mainAirPipe.position.set(-tankW / 2 + 1.2, 0.8, 0);
+            tankGroup.add(mainAirPipe);
+
+            const discGeo = new THREE.CylinderGeometry(0.35, 0.35, 0.08, 16);
+            const discMat = new THREE.MeshStandardMaterial({ color: 0x0284c7, metalness: 0.4, roughness: 0.5 });
+
+            for (let i = -3; i <= 3; i++) {
+                const branch = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, tankW - 3.2), pipeM);
+                branch.rotation.z = Math.PI / 2;
+                branch.position.set(0.5, 0.8, i * 1.15);
+                tankGroup.add(branch);
+
+                // Add circular disc diffusers along each lateral
+                for (let j = -3; j <= 3; j++) {
+                    const disc = new THREE.Mesh(discGeo, discMat);
+                    disc.position.set(j * 1.4 + 0.5, 0.88, i * 1.15);
+                    tankGroup.add(disc);
+                }
+            }
+
+            // Top Walkway & Guardrails
+            const walkway = new THREE.Mesh(new THREE.BoxGeometry(tankW + 0.6, 0.22, 1.8), concreteMat);
+            walkway.position.set(0, tankH + 0.1, 0);
+            tankGroup.add(walkway);
+
+            scene.add(tankGroup);
+
+            // Generate Air Bubbles & Mixed Liquor Biomass Particles
+            createAerationParticles(tankGroup.position, tankW - 2.5, tankH - 1.8, tankD - 2.5);
+        }
+
+        function createAerationParticles(tankPos, w, h, d) {
+            // 1. 공기 공급 뽀글뽀글 기포 (Air Bubbles)
+            const bubbleCount = 380;
+            const bubbleGeo = new THREE.SphereGeometry(0.075, 6, 6);
+            const bubbleMat = new THREE.MeshBasicMaterial({
+                color: 0xffffff,
+                transparent: true,
+                opacity: 0.88
+            });
+
+            for (let i = 0; i < bubbleCount; i++) {
+                const mesh = new THREE.Mesh(bubbleGeo, bubbleMat);
+                mesh.position.set(
+                    tankPos.x + (Math.random() - 0.5) * w,
+                    0.9 + Math.random() * h,
+                    tankPos.z + (Math.random() - 0.5) * d
+                );
+                mesh.userData = {
+                    speedY: 0.05 + Math.random() * 0.08,
+                    swaySpeed: 3 + Math.random() * 4,
+                    swayAmp: 0.02 + Math.random() * 0.035,
+                    startY: 0.9,
+                    maxY: 0.9 + h,
+                    origX: mesh.position.x,
+                    origZ: mesh.position.z,
+                    phase: Math.random() * Math.PI * 2
+                };
+                scene.add(mesh);
+                bubbleParticles.push(mesh);
+            }
+
+            // 2. 미생물 황갈색 부유 입자군 (Suspended Microbial Flocs / MLVSS)
+            const flocCount = 420;
+            const flocColors = [0x92400e, 0xb45309, 0xd97706, 0x78350f];
+            
+            for (let i = 0; i < flocCount; i++) {
+                const size = 0.06 + Math.random() * 0.11;
+                const flocGeo = new THREE.DodecahedronGeometry(size, 0);
+                const flocMat = new THREE.MeshStandardMaterial({
+                    color: flocColors[Math.floor(Math.random() * flocColors.length)],
+                    roughness: 0.9,
+                    metalness: 0.05
+                });
+                const mesh = new THREE.Mesh(flocGeo, flocMat);
+                
+                mesh.position.set(
+                    tankPos.x + (Math.random() - 0.5) * w,
+                    0.9 + Math.random() * h,
+                    tankPos.z + (Math.random() - 0.5) * d
+                );
+                
+                mesh.userData = {
+                    // 폭기 교반에 의한 와류 및 순환 운동
+                    vortexCenter: tankPos.x,
+                    angle: Math.random() * Math.PI * 2,
+                    angularSpeed: 0.8 + Math.random() * 1.5,
+                    radius: 0.5 + Math.random() * (w / 2 - 0.6),
+                    speedY: (Math.random() - 0.45) * 0.03,
+                    minY: 0.9,
+                    maxY: 0.9 + h - 0.2,
+                    rotSpeedX: Math.random() * 0.05,
+                    rotSpeedY: Math.random() * 0.05
+                };
+                scene.add(mesh);
+                flocParticles.push(mesh);
+            }
+        }
+
+        function buildSecondaryClarifier() {
+            const clarGroup = new THREE.Group();
+            clarGroup.position.set(11, 0, 0);
+
+            const radius = 6.2;
+            const cylinderH = 3.5;
+            const coneH = 4.5;
+
+            const concreteMat = new THREE.MeshStandardMaterial({
+                color: 0x334155,
+                roughness: 0.7,
+                metalness: 0.25
+            });
+
+            // 1. 투명 관측창 원통형 수조 외벽 (Clear Inspection Acrylic Wall)
+            // 내부의 맑은 물과 바닥 슬러지 침전층을 외부에서 뚜렷하게 관찰할 수 있도록 투명 처리
+            const glassTankMat = new THREE.MeshPhysicalMaterial({
+                color: 0xa5f3fc,
+                transparent: true,
+                opacity: 0.25,
+                roughness: 0.05,
+                transmission: 0.92,
+                thickness: 0.5,
+                side: THREE.DoubleSide
+            });
+            const cylinderWall = new THREE.Mesh(
+                new THREE.CylinderGeometry(radius, radius, cylinderH, 36, 1, true),
+                glassTankMat
+            );
+            cylinderWall.position.y = coneH + cylinderH / 2;
+            clarGroup.add(cylinderWall);
+
+            // 콘크리트 상단 림 링 및 가드 구조
+            const topRimMat = new THREE.MeshStandardMaterial({ color: 0x475569, metalness: 0.5 });
+            const topRim = new THREE.Mesh(new THREE.TorusGeometry(radius + 0.1, 0.18, 8, 36), topRimMat);
+            topRim.rotation.x = Math.PI / 2;
+            topRim.position.y = coneH + cylinderH;
+            clarGroup.add(topRim);
+
+            // 2. 하부 원추형 콘 호퍼 (투명 관측창이 결합된 원추 벽체)
+            const coneHopperMat = new THREE.MeshPhysicalMaterial({
+                color: 0x94a3b8,
+                transparent: true,
+                opacity: 0.32,
+                roughness: 0.1,
+                transmission: 0.85,
+                side: THREE.DoubleSide
+            });
+            const coneHopper = new THREE.Mesh(
+                new THREE.ConeGeometry(radius, coneH, 36, 1, true),
+                coneHopperMat
+            );
+            coneHopper.rotation.x = Math.PI;
+            coneHopper.position.y = coneH / 2;
+            clarGroup.add(coneHopper);
+
+            // 3. 바닥층 진한 갈색 농축 슬러지 침전층 (Settled Sludge Blanket - 진한 초콜릿 암갈색)
+            const thickSludgeMat = new THREE.MeshStandardMaterial({
+                color: 0x2e1505, // 짙은 고농도 슬러지 암갈색
+                roughness: 0.92,
+                metalness: 0.05,
+                side: THREE.DoubleSide
+            });
+            // 호퍼 바닥을 꽉 채우는 원추형 농축층
+            const sludgeHopper = new THREE.Mesh(
+                new THREE.ConeGeometry(radius * 0.94, coneH * 0.92, 32),
+                thickSludgeMat
+            );
+            sludgeHopper.rotation.x = Math.PI;
+            sludgeHopper.position.y = coneH * 0.46;
+            clarGroup.add(sludgeHopper);
+
+            // 슬러지 블랭킷 상부의 뚜렷한 침강 계면 (Sludge-Water Interface Layer)
+            const sludgeInterfaceMat = new THREE.MeshStandardMaterial({
+                color: 0x451a03,
+                roughness: 0.85,
+                side: THREE.DoubleSide
+            });
+            const sludgeInterfaceDisk = new THREE.Mesh(
+                new THREE.CircleGeometry(radius * 0.93, 32),
+                sludgeInterfaceMat
+            );
+            sludgeInterfaceDisk.rotation.x = -Math.PI / 2;
+            sludgeInterfaceDisk.position.y = coneH * 0.92;
+            clarGroup.add(sludgeInterfaceDisk);
+
+            // 4. 위쪽 맑은 물 층 (투명한 하늘색 청징 상등수 - Clear Water Layer)
+            const clarifiedWaterMat = new THREE.MeshPhysicalMaterial({
+                color: 0x0284c7,          // 맑고 투명한 청록/하늘색
+                transparent: true,
+                opacity: 0.45,
+                roughness: 0.05,
+                transmission: 0.88,
+                thickness: 1.2,
+                ior: 1.33
+            });
+            const waterUpper = new THREE.Mesh(
+                new THREE.CylinderGeometry(radius - 0.15, radius - 0.15, cylinderH - 0.25, 32),
+                clarifiedWaterMat
+            );
+            waterUpper.position.y = coneH + (cylinderH - 0.25) / 2 + 0.05;
+            clarGroup.add(waterUpper);
+
+            // 5. 원형 유출 웨어 (Circular Peripheral Effluent Weir)
+            const weirRingMat = new THREE.MeshStandardMaterial({ color: 0x38bdf8, metalness: 0.7, roughness: 0.2 });
+            const weirRing = new THREE.Mesh(
+                new THREE.TorusGeometry(radius - 0.35, 0.16, 12, 48),
+                weirRingMat
+            );
+            weirRing.rotation.x = Math.PI / 2;
+            weirRing.position.y = coneH + cylinderH - 0.3;
+            clarGroup.add(weirRing);
+
+            // 6. 회전 슬러지 스크래퍼 브릿지 & 중심 피드웰
+            const scraperGroup = new THREE.Group();
+            scraperGroup.position.y = coneH + cylinderH + 0.3;
+
+            // Center Stilling Feedwell Cylinder (피드웰)
+            const feedWell = new THREE.Mesh(
+                new THREE.CylinderGeometry(1.4, 1.4, 2.2, 24, 1, true),
+                new THREE.MeshStandardMaterial({ color: 0x64748b, metalness: 0.6, side: THREE.DoubleSide })
+            );
+            feedWell.position.y = -1.2;
+            scraperGroup.add(feedWell);
+
+            // Center Column & Drive Motor Box
+            const centerCol = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.35, cylinderH + coneH + 1, 16), pipeMat());
+            centerCol.position.y = -(cylinderH + coneH + 1) / 2 + 0.4;
+            scraperGroup.add(centerCol);
+
+            const motorBox = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.7, 0.8), new THREE.MeshStandardMaterial({ color: 0x0284c7, metalness: 0.7 }));
+            motorBox.position.y = 0.45;
+            scraperGroup.add(motorBox);
+
+            // Bridge Beam Truss
+            const bridgeBeam = new THREE.Mesh(new THREE.BoxGeometry(radius * 2 + 0.5, 0.38, 1.1), pipeMat());
+            bridgeBeam.castShadow = true;
+            scraperGroup.add(bridgeBeam);
+
+            // Scraper Rakes
+            for (let i = -4; i <= 4; i += 2) {
+                if (i === 0) continue;
+                const hanger = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, coneH + 1.2), pipeMat());
+                hanger.position.set(i * 1.1, -(coneH + 1.2) / 2, 0);
+                scraperGroup.add(hanger);
+            }
+
+            clarGroup.add(scraperGroup);
+            clarifierScraperMesh = scraperGroup;
+
+            // Base Pier Support Columns
+            for (let angle = 0; angle < Math.PI * 2; angle += Math.PI / 2) {
+                const leg = new THREE.Mesh(new THREE.BoxGeometry(0.85, coneH, 0.85), concreteMat);
+                leg.position.set(Math.cos(angle) * (radius - 1.2), coneH / 2, Math.sin(angle) * (radius - 1.2));
+                clarGroup.add(leg);
+            }
+
+            scene.add(clarGroup);
+
+            // Generate Settling Sludge Floc Particles in Clarifier (피드웰에서 바닥 슬러지층으로 침강)
+            createSettlingParticles(clarGroup.position, radius, coneH, cylinderH);
+        }
+
+        function createSettlingParticles(centerPos, r, coneH, cylH) {
+            const settlingCount = 140;
+            const settlingGeo = new THREE.SphereGeometry(0.08, 6, 6);
+            const settlingMat = new THREE.MeshStandardMaterial({
+                color: 0x78350f,
+                roughness: 0.9,
+                transparent: true,
+                opacity: 0.75
+            });
+
+            for (let i = 0; i < settlingCount; i++) {
+                const mesh = new THREE.Mesh(settlingGeo, settlingMat);
+                // 중심 피드웰 주변에서 시작하여 방사형 및 하향 침강
+                const angle = Math.random() * Math.PI * 2;
+                const dist = 0.4 + Math.random() * (r - 1.2);
+                
+                mesh.position.set(
+                    centerPos.x + Math.cos(angle) * dist,
+                    coneH + Math.random() * (cylH - 0.8),
+                    centerPos.z + Math.sin(angle) * dist
+                );
+
+                mesh.userData = {
+                    centerX: centerPos.x,
+                    centerZ: centerPos.z,
+                    angle: angle,
+                    radius: dist,
+                    speedY: 0.015 + Math.random() * 0.02, // 천천히 가라앉는 침강 속도
+                    radialDrift: (Math.random() - 0.2) * 0.008,
+                    startY: coneH + cylH - 0.5,
+                    bottomY: coneH * 0.92, // 바닥 슬러지 블랭킷 계면까지 침강
+                    initialDist: dist
+                };
+
+                scene.add(mesh);
+                settlingParticles.push(mesh);
+            }
+        }
+
+        function pipeMat() {
+            return new THREE.MeshStandardMaterial({
+                color: 0x94a3b8,
+                metalness: 0.85,
+                roughness: 0.25
+            });
+        }
+
+        function buildPipingNetwork() {
+            // 1. Influent Pipe (Q, Ci)
+            const pipeQ = createCurvedPipe([
+                new THREE.Vector3(-24, 2, 0),
+                new THREE.Vector3(-20, 2, 0),
+                new THREE.Vector3(-20, 7, 0),
+                new THREE.Vector3(-18, 7, 0)
+            ], 0.36, 0x0284c7);
+            scene.add(pipeQ);
+
+            // 2. Aeration -> Clarifier Feed Canal
+            const pipeAtoC = createCurvedPipe([
+                new THREE.Vector3(-4, 6.5, 0),
+                new THREE.Vector3(0, 6.5, 0),
+                new THREE.Vector3(5, 6.5, 0),
+                new THREE.Vector3(11, 6.5, 0)
+            ], 0.45, 0xb45309);
+            scene.add(pipeAtoC);
+
+            // 3. Clarifier Bottom Sludge Drain
+            const pipeSludgeBottom = createCurvedPipe([
+                new THREE.Vector3(11, 0.3, 0),
+                new THREE.Vector3(11, 0.3, 8),
+                new THREE.Vector3(3, 0.3, 8)
+            ], 0.35, 0x78350f);
+            scene.add(pipeSludgeBottom);
+
+            // 4. Return Activated Sludge (RAS) Line (Qr, Xr)
+            const pipeQr = createCurvedPipe([
+                new THREE.Vector3(3, 0.3, 8),
+                new THREE.Vector3(-8, 0.3, 8),
+                new THREE.Vector3(-16, 0.3, 8),
+                new THREE.Vector3(-18, 0.3, 3),
+                new THREE.Vector3(-18, 4, 0)
+            ], 0.3, 0xb45309);
+            scene.add(pipeQr);
+
+            // Sludge Pump
+            const pumpGroup = new THREE.Group();
+            pumpGroup.position.set(-6, 0.6, 8);
+            const pumpBody = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.7, 1.2, 16), new THREE.MeshStandardMaterial({ color: 0x0284c7, metalness: 0.8 }));
+            pumpBody.rotation.z = Math.PI / 2;
+            const pumpMotor = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.9, 0.8), new THREE.MeshStandardMaterial({ color: 0x1e293b }));
+            pumpMotor.position.x = 0.8;
+            pumpGroup.add(pumpBody, pumpMotor);
+            scene.add(pumpGroup);
+
+            // 5. Waste Activated Sludge (WAS) Line (Qw, Xw)
+            const pipeQw = createCurvedPipe([
+                new THREE.Vector3(3, 0.3, 8),
+                new THREE.Vector3(3, 0.3, 14),
+                new THREE.Vector3(5, 0.3, 18)
+            ], 0.25, 0xf43f5e);
+            scene.add(pipeQw);
+
+            // 6. Clarified Effluent Outflow (Qe, Xe, Co)
+            const pipeQe = createCurvedPipe([
+                new THREE.Vector3(17.2, 7.6, 0),
+                new THREE.Vector3(20, 7.6, 0),
+                new THREE.Vector3(20, 2, 0),
+                new THREE.Vector3(24, 2, 0)
+            ], 0.35, 0x10b981);
+            scene.add(pipeQe);
+        }
+
+        function createCurvedPipe(points, radius, colorHex) {
+            const curve = new THREE.CatmullRomCurve3(points);
+            const tubeGeo = new THREE.TubeGeometry(curve, 45, radius, 14, false);
+            const tubeMat = new THREE.MeshStandardMaterial({
+                color: colorHex || 0x64748b,
+                metalness: 0.75,
+                roughness: 0.25,
+                transparent: true,
+                opacity: 0.92
+            });
+            return new THREE.Mesh(tubeGeo, tubeMat);
+        }
+
+        function initFlowParticles() {
+            // Path 1: Influent Flow
+            createParticlePath([
+                new THREE.Vector3(-24, 2, 0),
+                new THREE.Vector3(-20, 2, 0),
+                new THREE.Vector3(-20, 7, 0),
+                new THREE.Vector3(-18, 7, 0),
+                new THREE.Vector3(-11, 4, 0)
+            ], 0x38bdf8, 20, 0.008);
+
+            // Path 2: Aeration -> Clarifier Mixed Liquor
+            createParticlePath([
+                new THREE.Vector3(-4, 6.5, 0),
+                new THREE.Vector3(0, 6.5, 0),
+                new THREE.Vector3(5, 6.5, 0),
+                new THREE.Vector3(11, 6.5, 0)
+            ], 0xf59e0b, 18, 0.006);
+
+            // Path 3: Return Sludge RAS
+            createParticlePath([
+                new THREE.Vector3(11, 0.3, 0),
+                new THREE.Vector3(11, 0.3, 8),
+                new THREE.Vector3(3, 0.3, 8),
+                new THREE.Vector3(-8, 0.3, 8),
+                new THREE.Vector3(-16, 0.3, 8),
+                new THREE.Vector3(-18, 0.3, 3),
+                new THREE.Vector3(-18, 4, 0)
+            ], 0xd97706, 35, 0.007);
+
+            // Path 4: Waste Sludge WAS
+            createParticlePath([
+                new THREE.Vector3(3, 0.3, 8),
+                new THREE.Vector3(3, 0.3, 14),
+                new THREE.Vector3(5, 0.3, 18)
+            ], 0xf43f5e, 14, 0.0045);
+
+            // Path 5: Clarified Effluent
+            createParticlePath([
+                new THREE.Vector3(17.2, 7.6, 0),
+                new THREE.Vector3(20, 7.6, 0),
+                new THREE.Vector3(20, 2, 0),
+                new THREE.Vector3(24, 2, 0)
+            ], 0x34d399, 18, 0.009);
+        }
+
+        function createParticlePath(points, colorHex, count, baseSpeed) {
+            const curve = new THREE.CatmullRomCurve3(points);
+            const pGroup = [];
+            const geo = new THREE.SphereGeometry(0.13, 6, 6);
+            const mat = new THREE.MeshBasicMaterial({ color: colorHex });
+
+            for (let i = 0; i < count; i++) {
+                const mesh = new THREE.Mesh(geo, mat);
+                const progress = i / count;
+                mesh.userData = {
+                    progress: progress,
+                    speed: baseSpeed,
+                    curve: curve
+                };
+                const pos = curve.getPointAt(progress);
+                mesh.position.copy(pos);
+                scene.add(mesh);
+                pGroup.push(mesh);
+            }
+            flowParticleSystems.push(pGroup);
+        }
+
+        /* ==========================================================================
+           4. SIMULATION ANIMATION TICK LOOP
+           ========================================================================== */
+        const clock = new THREE.Clock();
+
+        function animate() {
+            requestAnimationFrame(animate);
+            const delta = clock.getDelta();
+            const elapsed = clock.elapsedTime;
+
+            controls.update();
+
+            if (state.isRunning) {
+                // 1. 침전지 스크래퍼 브릿지 지속 회전
+                if (clarifierScraperMesh) {
+                    clarifierScraperMesh.rotation.y += delta * 0.15;
+                }
+
+                // 2. 포기조 뽀글뽀글 기포 상승 애니메이션
+                if (state.showBubbles) {
+                    for (let i = 0; i < bubbleParticles.length; i++) {
+                        const b = bubbleParticles[i];
+                        b.visible = true;
+                        b.position.y += b.userData.speedY;
+                        b.position.x = b.userData.origX + Math.sin(elapsed * b.userData.swaySpeed + b.userData.phase) * b.userData.swayAmp;
+                        b.position.z = b.userData.origZ + Math.cos(elapsed * b.userData.swaySpeed + b.userData.phase) * b.userData.swayAmp;
+
+                        if (b.position.y > b.userData.maxY) {
+                            b.position.y = b.userData.startY;
+                        }
+                    }
+                } else {
+                    for (let i = 0; i < bubbleParticles.length; i++) {
+                        bubbleParticles[i].visible = false;
+                    }
+                }
+
+                // 3. 포기조 미생물 황갈색 부유 입자군 폭기 와류 순환 운동
+                for (let i = 0; i < flocParticles.length; i++) {
+                    const f = flocParticles[i];
+                    f.rotation.x += f.userData.rotSpeedX;
+                    f.rotation.y += f.userData.rotSpeedY;
+
+                    // 공기 방울 상승류와 와류에 따른 궤도 선회
+                    f.userData.angle += f.userData.angularSpeed * delta * 0.6;
+                    f.position.x = f.userData.vortexCenter + Math.cos(f.userData.angle) * f.userData.radius;
+                    f.position.z += Math.sin(elapsed * 1.5 + f.userData.angle) * 0.015;
+                    f.position.y += f.userData.speedY;
+
+                    if (f.position.y > f.userData.maxY) {
+                        f.position.y = f.userData.minY;
+                    } else if (f.position.y < f.userData.minY) {
+                        f.position.y = f.userData.maxY;
+                    }
+                }
+
+                // 4. 침전지 슬러지 침강 입자 (피드웰 -> 바닥 슬러지층으로 하향 침전)
+                for (let i = 0; i < settlingParticles.length; i++) {
+                    const s = settlingParticles[i];
+                    s.position.y -= s.userData.speedY;
+                    
+                    // 서서히 반경 바깥으로 퍼지며 침강
+                    s.userData.radius += s.userData.radialDrift;
+                    s.position.x = s.userData.centerX + Math.cos(s.userData.angle) * s.userData.radius;
+                    s.position.z = s.userData.centerZ + Math.sin(s.userData.angle) * s.userData.radius;
+
+                    // 바닥 슬러지 블랭킷 계면에 도달하면 상단 유입부로 리셋
+                    if (s.position.y <= s.userData.bottomY) {
+                        s.position.y = s.userData.startY;
+                        s.userData.radius = s.userData.initialDist;
+                    }
+                }
+
+                // 5. 배관 유체 파티클 이동 (유입유량 Q에 비례)
+                const speedScale = (state.Q / 5000.0);
+                for (let s = 0; s < flowParticleSystems.length; s++) {
+                    const pList = flowParticleSystems[s];
+                    for (let i = 0; i < pList.length; i++) {
+                        const p = pList[i];
+                        p.userData.progress += p.userData.speed * speedScale;
+                        if (p.userData.progress > 1.0) {
+                            p.userData.progress -= 1.0;
+                        }
+                        const nextPos = p.userData.curve.getPointAt(p.userData.progress);
+                        p.position.copy(nextPos);
+                    }
+                }
+            }
+
+            renderer.render(scene, camera);
+        }
+
+        function onWindowResize() {
+            const container = document.getElementById('canvas-container');
+            if (!container || !renderer || !camera) return;
+            const w = container.clientWidth;
+            const h = container.clientHeight;
+            camera.aspect = w / h;
+            camera.updateProjectionMatrix();
+            renderer.setSize(w, h);
+        }
+
+        /* ==========================================================================
+           5. EVENT LISTENERS & USER INTERACTION WIRING
+           ========================================================================== */
+        function renderMath() {
+            if (window.renderMathInElement) {
+                renderMathInElement(document.body, {
+                    delimiters: [
+                        {left: '$$', right: '$$', display: true},
+                        {left: '$', right: '$', display: false}
+                    ],
+                    throwOnError: false
+                });
+            }
+        }
+
+        window.addEventListener('load', () => {
+            lucide.createIcons();
+            initThree();
+            calculateProcess();
+            animate();
+
+            // Render math equations on load
+            renderMath();
+
+            // Setup Slider Listeners
+            setupSlider('input_Q', (val) => { state.Q = parseFloat(val); calculateProcess(); });
+            setupSlider('input_V', (val) => { state.V = parseFloat(val); calculateProcess(); });
+            setupSlider('input_X', (val) => { state.X = parseFloat(val); calculateProcess(); });
+            setupSlider('input_Ci', (val) => { state.Ci = parseFloat(val); calculateProcess(); });
+            setupSlider('input_Co', (val) => { state.Co = parseFloat(val); calculateProcess(); });
+            setupSlider('input_Y', (val) => { state.Y = parseFloat(val); calculateProcess(); });
+            setupSlider('input_kd', (val) => { state.kd = parseFloat(val); calculateProcess(); });
+            setupSlider('input_Xr', (val) => { state.Xr = parseFloat(val); calculateProcess(); });
+            setupSlider('input_Qr', (val) => { state.Qr = parseFloat(val); calculateProcess(); });
+            setupSlider('input_Xe', (val) => { state.Xe = parseFloat(val); calculateProcess(); });
+
+            // Standard Preset Reset Listener (Restores Standard Conventional Parameters)
+            document.getElementById('btnResetStandard').addEventListener('click', () => {
+                setParams({ Q: 5000, V: 1400, X: 1800, Ci: 200, Co: 15, Y: 0.65, kd: 0.05, Xr: 8000, Qr: 2500, Xe: 10 });
+            });
+
+            // Camera View Angle Buttons
+            document.getElementById('viewIsometric').addEventListener('click', () => {
+                setCameraPos(-28, 22, 34, 0, 2.5, 0);
+            });
+            document.getElementById('viewAeration').addEventListener('click', () => {
+                setCameraPos(-14, 12, 16, -11, 4, 0);
+            });
+            document.getElementById('viewClarifier').addEventListener('click', () => {
+                setCameraPos(12, 14, 18, 11, 4, 0);
+            });
+            document.getElementById('viewPipes').addEventListener('click', () => {
+                setCameraPos(-2, 18, 25, -2, 2, 6);
+            });
+            document.getElementById('btnResetView').addEventListener('click', () => {
+                setCameraPos(-28, 22, 34, 0, 2.5, 0);
+            });
+
+            // Simulation Controls
+            const btnToggleAnim = document.getElementById('btnToggleAnim');
+            const iconPlay = document.getElementById('iconPlay');
+            const textPlay = document.getElementById('textPlay');
+            btnToggleAnim.addEventListener('click', () => {
+                state.isRunning = !state.isRunning;
+                if (state.isRunning) {
+                    textPlay.innerText = "가동 중";
+                    iconPlay.setAttribute('data-lucide', 'play');
+                    iconPlay.className = "w-3.5 h-3.5 text-emerald-400";
+                } else {
+                    textPlay.innerText = "일시정지";
+                    iconPlay.setAttribute('data-lucide', 'pause');
+                    iconPlay.className = "w-3.5 h-3.5 text-amber-400";
+                }
+                lucide.createIcons();
+            });
+
+            document.getElementById('chkBubbles').addEventListener('change', (e) => {
+                state.showBubbles = e.target.checked;
+            });
+
+            // Auto Balance Button (Target F/M ~ 0.3)
+            document.getElementById('btnAutoBalance').addEventListener('click', () => {
+                const targetV = Math.round((state.Ci * state.Q) / (state.X * 0.3));
+                state.V = Math.min(Math.max(targetV, 200), 8000);
+                document.getElementById('input_V').value = state.V;
+                calculateProcess();
+            });
+
+            // Theory Modal Trigger
+            const modal = document.getElementById('theoryModal');
+            document.getElementById('btnOpenTheory').addEventListener('click', () => {
+                modal.classList.remove('hidden');
+                // Re-render math inside modal
+                renderMath();
+            });
+            document.getElementById('btnCloseTheory').addEventListener('click', () => {
+                modal.classList.add('hidden');
+            });
+            document.getElementById('btnCloseTheoryBottom').addEventListener('click', () => {
+                modal.classList.add('hidden');
+            });
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) modal.classList.add('hidden');
+            });
+        });
+
+        function setupSlider(id, callback) {
+            const el = document.getElementById(id);
+            el.addEventListener('input', (e) => callback(e.target.value));
+        }
+
+        function setCameraPos(x, y, z, tx, ty, tz) {
+            camera.position.set(x, y, z);
+            controls.target.set(tx, ty, tz);
+            controls.update();
+        }
+
+        function setParams(p) {
+            state.Q = p.Q; document.getElementById('input_Q').value = p.Q;
+            state.V = p.V; document.getElementById('input_V').value = p.V;
+            state.X = p.X; document.getElementById('input_X').value = p.X;
+            state.Ci = p.Ci; document.getElementById('input_Ci').value = p.Ci;
+            state.Co = p.Co; document.getElementById('input_Co').value = p.Co;
+            state.Y = p.Y; document.getElementById('input_Y').value = p.Y;
+            state.kd = p.kd; document.getElementById('input_kd').value = p.kd;
+            state.Xr = p.Xr; document.getElementById('input_Xr').value = p.Xr;
+            state.Qr = p.Qr; document.getElementById('input_Qr').value = p.Qr;
+            state.Xe = p.Xe; document.getElementById('input_Xe').value = p.Xe;
+            calculateProcess();
+        }
+    </script>
+</body>
+</html>
